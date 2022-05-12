@@ -113,7 +113,7 @@ public:
 	int counter = 0;
 	bool isHost = 0;
 	desk(bool thisHost) {
-		isHost = thisHost;
+		isHost = 1;
 		for (int i = 0; i < 16; i++)
 		{
 			teamBlack[i] = new figure(i, defaultdesk[i] - '0', 0, i);
@@ -144,7 +144,7 @@ public:
 		showdesk();
 	}
 	desk() {
-
+		isHost = 0;
 		for (int i = 0; i < 16; i++)
 		{
 			teamBlack[i] = new figure(i, defaultdesk[i] - '0', 0, i);
@@ -857,9 +857,10 @@ public:
 		return 2;
 	}
 	
-	int Multiplayer(int player, int counter, SOCKET connection)
+
+	int SendCoordinates(int player, int counter, SOCKET connection)
 	{
-		char check[256] = "OK";
+		const char check[256] = "OK";
 		char temp[256];
 		cout << "isHost#DEBUG#: " << isHost;
 		cout << "Move #" << counter << endl;
@@ -870,68 +871,88 @@ public:
 		}
 		cout << "#Player" << player << "'s turn" << endl;
 		int piece, destination;
-		if (player % 2 != isHost)
+		piece = askPiece(player);
+		destination = askDestination(player, piece);
+		if (destination == -1)
 		{
-			char msg[256];
-			recv(connection, msg, sizeof(msg), NULL);
-			send(connection, check, sizeof(check), NULL);
-			stringstream stream;
-			stream << msg;
-			stream >> piece;
-			stream.clear();
-			recv(connection, msg, sizeof(msg), NULL);
-			send(connection, check, sizeof(check), NULL);
-			stream << msg;
-			stream >> destination;
-			stream.clear();
+			return SendCoordinates(player, counter, connection);
+		}
 			changePosition(piece, destination);
 			updateCovers();
 			ClearConsole();
 			showdesk();
+			char msg[256];
+			strcpy(msg, to_string(piece).c_str());
+			cout << msg;
+			send(connection, msg, sizeof(msg), NULL);
+			recv(connection, temp, sizeof(msg), NULL);
+			if (strcmp(temp, check) != 0)
+			{
+				cout << "Bad response!!!\n";
+				cout << "Message was: " << msg << "\n#ERRORValue:" << strcmp(temp, check);
+				cin.get();
+				exit(1);
+			}
+			strcpy(msg, to_string(destination).c_str());
+			cout << msg;
+			send(connection, msg, sizeof(msg), NULL);
+			recv(connection, temp, sizeof(msg), NULL);
+			if (strcmp(temp, check) != 0)
+			{
+				cout << "Bad response!!!\n";
+				cout << "Message was: " << msg << "\n#ERRORValue:"<< strcmp(temp, check);
+				cin.get();
+				exit(1);
+			}
+			cin.get();
+			return 2;
 
+	}
+	int GetCoordinates(int player, int counter, SOCKET connection)
+	{
+
+		const char check[256] = "OK";
+		char temp[256];
+		cout << "isHost#DEBUG#: " << isHost;
+		cout << "Move #" << counter << endl;
+		cout << "Black Ps: " << PiecesCount(0) << "\t||\tWhite Ps: " << PiecesCount(1) << endl;
+		if (PiecesCount(0) == 0 || PiecesCount(1) == 0)
+		{
+			return ((player + 1) % 2);
+		}
+		cout << "#Player" << player << "'s turn" << endl;
+		int piece, destination;
+		char msg[256];
+		recv(connection, msg, sizeof(msg), NULL);
+		send(connection, check, sizeof(check), NULL);
+		stringstream stream;
+		stream << msg;
+		stream >> piece;
+		stream.clear();
+		recv(connection, msg, sizeof(msg), NULL);
+		send(connection, check, sizeof(check), NULL);
+		stream << msg;
+		stream >> destination;
+		stream.clear();
+		changePosition(piece, destination);
+		updateCovers();
+		ClearConsole();
+		showdesk();
+		return 2;
+
+
+	}
+	int Multiplayer(int player, int counter, SOCKET connection)
+	{
+		int currentPlayer = player + isHost;
+		if (currentPlayer%2==0)
+		{
+			return SendCoordinates(player, counter, connection);
 		}
 		else
 		{
-			piece = askPiece(player);
-			destination = askDestination(player, piece);
-			if (destination == -1)
-			{
-				Multiplayer(player, counter, connection);
-			}
-			else {
-				cin.get();
-				changePosition(piece, destination);
-				updateCovers();
-				ClearConsole();
-				showdesk();
-				char msg[256];
-				strcpy(msg,to_string(piece).c_str());
-				cout << msg;
-				send(connection, msg, sizeof(msg), NULL);
-				recv(connection, temp, sizeof(msg), NULL);
-				if (strcmp(temp, check) != 0)
-				{
-					cout << "Bad response!!!\n";
-					cout << "Message was: " << msg;
-					cin.get();
-					exit(1);
-				}
-				strcpy(msg, to_string(destination).c_str());
-				cout << msg;
-				send(connection, msg, sizeof(msg), NULL);
-				recv(connection, temp, sizeof(msg), NULL);
-				if (strcmp(temp, check) != 0)
-				{
-					cout << "Bad response!!!\n";
-					cout << "Message was: " << msg;
-					cin.get();
-					exit(1);
-				}
-				cin.get();
-			}
+			return GetCoordinates(player, counter, connection);
 		}
-		
-		return 2;
 
 	}
 
@@ -940,7 +961,7 @@ public:
 class Multiplayer {
 public:
 
-	SOCKET Connection;
+	SOCKET Connection ;
 	Multiplayer() {
 
 		WSAData wsaData;
@@ -985,7 +1006,6 @@ public:
 		bind(sListen, (SOCKADDR*)&addr, sizeof(addr));
 		listen(sListen, SOMAXCONN);
 		cout << "\n*Listening*...";
-		SOCKET Connection;
 		Connection = accept(sListen, (SOCKADDR*)&addr, &sizeofaddr);
 		recv(Connection, temp, sizeof(temp), NULL);
 		if (strcmp(temp, check) != 0)
@@ -1101,24 +1121,24 @@ void ServerInit()
 	cfi.dwFontSize.X += 4;
 	SetCurrentConsoleFontEx(soh, FALSE, &cfi);
 	char temp[256];
-	desk* newgame = new desk(true);
 	int check = 2, limit = 1;
 	char inputAnswer[256];
 	const string agree = "-y";
-	cout << endl << endl << endl;
-	newgame->updateCovers();
-	ClearConsole();
-	newgame->showdesk();
+	
 	int counter = 1;
 	for (int i = 0; i < limit; i++) {
 		check = 2;
 		system("cls");
-		delete[] newgame;
 		desk* newgame = new desk(true);
+		cout << endl << endl << endl;
+		newgame->updateCovers();
+		ClearConsole();
+		newgame->showdesk();
 		while (check == 2)
 		{
 			check = newgame->Multiplayer(counter % 2, counter, server.Connection);
 			counter += 1;
+			Sleep(200);
 		}
 		strcpy(temp, "\n\nPlayer#");
 		strcpy(temp, to_string(check).c_str());
@@ -1128,12 +1148,13 @@ void ServerInit()
 		cin >> inputAnswer;
 		send(server.Connection, temp, sizeof(temp), NULL);
 		recv(server.Connection, temp, sizeof(temp), NULL);
-		if (inputAnswer == agree && temp == "OK")
+		if (inputAnswer == agree && strcmp(temp,"OK"))
 		{
 			limit += 1;
 			send(server.Connection, "OK", sizeof("OK"), NULL);
 
 	}
+		delete[] newgame;
 	}
 }
 void ClientInit()
@@ -1150,21 +1171,19 @@ void ClientInit()
 	cfi.dwFontSize.Y += 15;
 	cfi.dwFontSize.X += 4;
 	SetCurrentConsoleFontEx(soh, FALSE, &cfi);
-
-	desk* newgame = new desk;
 	int check = 2, limit = 1;
 	char inputAnswer[256];
 	const string agree = "-y";
-	cout << endl << endl << endl;
-	newgame->updateCovers();
-	ClearConsole();
-	newgame->showdesk();
+	
 	int counter = 1;
 	for (int i = 0; i < limit; i++) {
 		check = 2;
 		system("cls");
-		delete[] newgame;
+		cout << endl << endl << endl;
 		desk* newgame = new desk;
+		newgame->updateCovers();
+		ClearConsole();
+		newgame->showdesk();
 		while (check == 2)
 		{
 			check = newgame->Multiplayer(counter % 2, counter, client.Connection);
@@ -1179,7 +1198,7 @@ void ClientInit()
 		recv(client.Connection, temp, sizeof(temp), NULL);
 		if (temp == inputAnswer)
 			limit += 1;
-
+		delete[] newgame;
 	}
 }
 
