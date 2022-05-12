@@ -27,6 +27,7 @@ const char defaultdeskTest1[65] = { "0106010110101010010101011010101001010101101
 const char Mas[9] = { "ABCDEFGH" };
 const char mas[9] = { "abcdefgh" };
 const char nums[9] = { "12345678" };
+const int DEFAULT_PORT = 6666;
 using namespace std;
 const int MENU_OPTIONS = 3;
 void error(const char* message)
@@ -857,14 +858,21 @@ public:
 		return 2;
 	}
 	
-
+	void showInfo(bool isHost,int counter, int blackPieces, int whitePieces)
+	{
+		if (!isHost)
+			cout << "Connected to game\n";
+		else
+			cout << "You're hosting a game\n";
+		cout << "Move #" << counter << endl;
+		cout << "Black Ps: " << blackPieces << "\t||\tWhite Ps: " << whitePieces << endl;
+	}
 	int SendCoordinates(int player, int counter, SOCKET connection)
 	{
 		const char check[256] = "OK";
 		char temp[256];
-		cout << "isHost#DEBUG#: " << isHost;
-		cout << "Move #" << counter << endl;
-		cout << "Black Ps: " << PiecesCount(0) << "\t||\tWhite Ps: " << PiecesCount(1) << endl;
+		int blackPieces = PiecesCount(0) , whitePieces = PiecesCount(1);
+		showInfo(isHost, counter, blackPieces, whitePieces);
 		if (PiecesCount(0) == 0 || PiecesCount(1) == 0)
 		{
 			return ((player + 1) % 2);
@@ -883,7 +891,6 @@ public:
 			showdesk();
 			char msg[256];
 			strcpy(msg, to_string(piece).c_str());
-			cout << msg;
 			send(connection, msg, sizeof(msg), NULL);
 			recv(connection, temp, sizeof(msg), NULL);
 			if (strcmp(temp, check) != 0)
@@ -894,7 +901,6 @@ public:
 				exit(1);
 			}
 			strcpy(msg, to_string(destination).c_str());
-			cout << msg;
 			send(connection, msg, sizeof(msg), NULL);
 			recv(connection, temp, sizeof(msg), NULL);
 			if (strcmp(temp, check) != 0)
@@ -913,10 +919,9 @@ public:
 
 		const char check[256] = "OK";
 		char temp[256];
-		cout << "isHost#DEBUG#: " << isHost;
-		cout << "Move #" << counter << endl;
-		cout << "Black Ps: " << PiecesCount(0) << "\t||\tWhite Ps: " << PiecesCount(1) << endl;
-		if (PiecesCount(0) == 0 || PiecesCount(1) == 0)
+		int blackPieces = PiecesCount(0), whitePieces = PiecesCount(1);
+		showInfo(isHost, counter, blackPieces, whitePieces);
+		if (blackPieces == 0 || whitePieces == 0)
 		{
 			return ((player + 1) % 2);
 		}
@@ -998,8 +1003,9 @@ public:
 
 		SOCKADDR_IN addr;
 		int sizeofaddr = sizeof(addr);
-		addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-		addr.sin_port = htons(1601);
+		addr.sin_addr.s_addr = htons(INADDR_ANY);
+		//addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+		addr.sin_port = htons(DEFAULT_PORT);
 		addr.sin_family = AF_INET;
 
 		SOCKET sListen = socket(AF_INET, SOCK_STREAM, NULL);
@@ -1040,8 +1046,8 @@ class Client : Multiplayer
 
 		SOCKADDR_IN addr;
 		int sizeofaddr = sizeof(addr);
-		addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-		addr.sin_port = htons(1601);
+		addr.sin_addr.s_addr = inet_addr(msg);
+		addr.sin_port = htons(DEFAULT_PORT);
 		addr.sin_family = AF_INET;
 
 		cout << "\n*Connecting*...";
